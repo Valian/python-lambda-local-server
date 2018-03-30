@@ -163,10 +163,6 @@ def get_args():
     parser.add_argument(
         '-r', '--requirements', type=str, default=SOURCES_REQUIREMENTS_NAME)
     parser.add_argument(
-        '-f', '--handler_file', type=str, default="handler.py")
-    parser.add_argument(
-        '--handler_func', type=str, default="handler")
-    parser.add_argument(
         '--force', action='store_true', default=False)
     return parser.parse_args()
 
