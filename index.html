@@ -7,7 +7,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.6.2/css/bulma.min.css">
   <style>
-
+    pre {
+        white-space: pre-wrap;       /* Since CSS 2.1 */
+        white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+        white-space: -pre-wrap;      /* Opera 4-6 */
+        white-space: -o-pre-wrap;    /* Opera 7 */
+        word-wrap: break-word;       /* Internet Explorer 5.5+ */
+    }
   </style>
 </head>
 <body>
@@ -21,6 +27,7 @@
     </div>
     <div class="columns">
       <div class="column">
+        <h1 class="subtitle">Input</h1>
         <label class="label">Handler</label>
         <div class="field is-grouped">
           <div class="control">
@@ -64,8 +71,27 @@
         </template>
       </div>
       <div class="column">
-        <h1>Output</h1>
-        <div>{{ this.output }}</div>
+        <h1 class="subtitle">Output</h1>
+        <div v-if="loading">Loading...</div>
+        <div v-else>
+          <div v-if="tab === 'event'">
+            {{ this.output }}
+          </div>
+          <div v-else>
+            <ul>
+              <li>
+                <strong>Status:</strong> {{ this.responseStatusCode }}
+              </li>
+              <li>
+                <strong>Headers:</strong> {{ this.responseHeaders }}
+              </li>
+              <li v-if="responseBody">
+                <strong>Body:</strong>
+                <pre>{{ this.responseBody | prettify }}</pre>
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -79,6 +105,7 @@
       body: '{}',
       qs: '',
       output: '',
+      loading: false,
       handlerFile: 'handler',
       handlerFunction: 'handler',
       tab: 'event'
@@ -94,6 +121,29 @@
     created: function () {
       this.loadState()
     },
+    computed: {
+      isJsonResponse: function () {
+        return this.output && this.output.headers && this.output.headers['Content-Type'] === 'application/json'
+      },
+      responseBody: function () {
+        if(this.isJsonResponse) {
+          return JSON.parse(this.output.body)
+        } else {
+          return this.output && this.output.body
+        }
+      },
+      responseStatusCode: function () {
+        return this.output && this.output.statusCode
+      },
+      responseHeaders: function () {
+        return this.output && this.output.headers
+      }
+    },
+    filters: {
+      prettify: function(val) {
+        return JSON.stringify(val, null, 2);
+      }
+    },
     methods: {
       saveState: function() {
         localStorage.setItem('lambda-dev', JSON.stringify(this.$data));
@@ -101,7 +151,6 @@
       loadState: function() {
         var savedState = localStorage.getItem('lambda-dev');
         var parsedState = savedState ? JSON.parse(savedState) : null;
-        console.log(parsedState)
         if (parsedState) {
           for(var key in parsedState) {
             this[key] = parsedState[key]
@@ -109,25 +158,23 @@
         }
       },
       submitEvent: function () {
-        var that = this;
-        axios.post('/', {
-          event: this.event,
-          file: this.handlerFile + '.' + this.handlerFunction
-        })
-          .then(function(response) { that.output = response.data })
-          .catch(function(error) { that.output = error.toString() })
+        return this.submit(this.event)
       },
       submitApi: function () {
+        return this.submit({
+          body: this.body,
+          queryStringParameters: this.qs
+        })
+      },
+      submit: function(eventData) {
         var that = this;
+        this.loading = true;
         axios.post('/', {
-          event: {
-            body: JSON.stringify(this.body),
-            queryStringParameters: this.qs
-          },
+          event: eventData,
           file: this.handlerFile + '.' + this.handlerFunction
         })
-          .then(function(response) { that.output = response.data })
-          .catch(function(error) { that.output = error.toString() })
+          .then(function(response) { that.output = response.data; that.loading = false; })
+          .catch(function(error) { that.output = error.toString(); that.loading = false; })
       }
     }
   })
