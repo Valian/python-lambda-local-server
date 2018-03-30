@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import hashlib
+import importlib
 import json
 import shutil
 import subprocess
@@ -18,9 +19,8 @@ from functools import partial
 from aiohttp import web
 from os import path
 
-from lambda_local.main import load_lib, load
+from lambda_local.main import load_lib
 from lambda_local.context import Context
-from lambda_local.event import read_event
 
 SOURCES_DIR = "/src"
 SOURCES_REQUIREMENTS_NAME = path.join(SOURCES_DIR, "requirements.txt")
@@ -37,18 +37,30 @@ def jsonify(data, status_code=200):
         status=status_code)
 
 
-async def parse_request(args, request_id, request):
+def load(directory, module, handler_path):
+    file_path = path.join(directory, module)
+    file_directory = path.dirname(file_path)
+    sys.path.append(file_directory)
+    function_file, function_name = path.splitext(handler_path)
+    mod = importlib.import_module(function_file)
+    importlib.reload(mod)
+    func = getattr(mod, function_name.strip('.'))
+    return func
+
+
+async def parse_request(args, request):
     data = await request.json()
     arn_string = data.get('arn', '')
     version = data.get('version', '')
-    event = data.get('event', {})
-    handler_file = data.get('file', "handler.py")
-    handler_name = data.get('handler', 'handler')
+    event = data.get('event', '{}')
+    module = data.get('module', '')
+    handler = data.get('file', 'handler.handler')
 
-    handler_path = path.join(args.directory, handler_file)
-    event = read_event(event)
+    if isinstance(event, str):
+        event = json.loads(event)
+
     context = Context(args.timeout, arn_string, version)
-    func = load(request_id, handler_path, handler_name)
+    func = load(args.directory, module, handler)
     return func, event, context
 
 
@@ -63,7 +75,7 @@ async def execute(func, event, context):
         err = sys.exc_info()
         result = json.dumps({
             "errorMessage": str(err[1]),
-            "stackTrace": str(traceback.extract_tb(err[2])),
+            "stackTrace": traceback.format_tb(err[2]),
             "errorType": err[0].__name__
         }, indent=4, separators=(',', ': '))
     return result
@@ -90,11 +102,15 @@ async def async_execute(request_id, func, event, context):
     return result
 
 
-async def index(args, request):
+async def run_lambda(args, request):
+    func, event, context = await parse_request(args, request)
     request_id = uuid.uuid4()
-    func, event, context = await parse_request(args, request_id, request)
     result = await async_execute(request_id, func, event, context)
     return jsonify(data=result)
+
+
+async def index(request):
+    return web.FileResponse('./index.html')
 
 
 def get_md5_of_file(path):
@@ -131,14 +147,15 @@ def init_logging(args):
 
 def create_app(args):
     app = web.Application()
-    app.router.add_post('/', partial(index, args))
+    app.router.add_get('/', index)
+    app.router.add_post('/', partial(run_lambda, args))
     return app
 
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-t', '--timeout', type=int,
+        '-t', '--timeout', type=float,
         default=6, help="Default timeout for function")
     parser.add_argument(
         '-d', '--directory', default=SOURCES_DIR,

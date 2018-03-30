@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Python lambda local server</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://unpkg.com/vue"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.6.2/css/bulma.min.css">
+  <style>
+
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="container section">
+    <div class="tabs is-fullwidth is-large">
+      <ul>
+        <li :class="{'is-active': tab === 'event'}" @click="tab = 'event'"><a>Event</a></li>
+        <li :class="{'is-active': tab === 'api'}" @click="tab = 'api'"><a>API Gateway</a></li>
+      </ul>
+    </div>
+    <div class="columns">
+      <div class="column">
+        <label class="label">Handler</label>
+        <div class="field is-grouped">
+          <div class="control">
+            <input class="input" v-model="handlerFile" placeholder="file">
+          </div>
+          <div class="control">
+            <input class="input" v-model="handlerFunction" placeholder="function">
+          </div>
+        </div>
+        <template v-if="tab === 'event'">
+          <div class="field">
+            <label class="label">Event</label>
+            <div class="control">
+              <textarea class="textarea" v-model="event"></textarea>
+            </div>
+          </div>
+          <div class="field">
+            <div class="control">
+              <button class="button is-primary" @click="submitEvent">Submit event</button>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <div class="field">
+            <label class="label">Query</label>
+            <div class="control">
+              <input class="input" v-model="qs">
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Body</label>
+            <div class="control">
+              <textarea class="textarea" v-model="body"></textarea>
+            </div>
+          </div>
+          <div class="field">
+            <div class="control">
+              <button class="button is-primary" @click="submitApi">Submit API call</button>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div class="column">
+        <h1>Output</h1>
+        <div>{{ this.output }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var app = new Vue({
+    el: '#app',
+    data: {
+      event: '{}',
+      body: '{}',
+      qs: '',
+      output: '',
+      handlerFile: 'handler',
+      handlerFunction: 'handler',
+      tab: 'event'
+    },
+    methods: {
+      submitEvent: function () {
+        var that = this;
+        axios.post('/', {
+          event: this.event,
+          file: this.handlerFile + '.' + this.handlerFunction
+        })
+          .then(function(response) { that.output = response.data })
+          .catch(function(error) { that.output = error.toString() })
+      },
+      submitApi: function () {
+        var that = this;
+        axios.post('/', {
+          event: {
+            body: JSON.stringify(this.body),
+            queryStringParameters: this.qs
+          },
+          file: this.handlerFile + '.' + this.handlerFunction
+        })
+          .then(function(response) { that.output = response.data })
+          .catch(function(error) { that.output = error.toString() })
+      }
+    }
+  })
+</script>
+</body>
+</html>
