@@ -83,7 +83,31 @@
       handlerFunction: 'handler',
       tab: 'event'
     },
+    watch: {
+      '$data': {
+        handler: function() {
+          this.saveState();
+        },
+        deep: true
+      }
+    },
+    created: function () {
+      this.loadState()
+    },
     methods: {
+      saveState: function() {
+        localStorage.setItem('lambda-dev', JSON.stringify(this.$data));
+      },
+      loadState: function() {
+        var savedState = localStorage.getItem('lambda-dev');
+        var parsedState = savedState ? JSON.parse(savedState) : null;
+        console.log(parsedState)
+        if (parsedState) {
+          for(var key in parsedState) {
+            this[key] = parsedState[key]
+          }
+        }
+      },
       submitEvent: function () {
         var that = this;
         axios.post('/', {
