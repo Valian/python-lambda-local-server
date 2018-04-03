@@ -37,13 +37,40 @@ def jsonify(data, status_code=200):
         status=status_code)
 
 
+import os
+import types
+import importlib
+
+
+def reload_package(package):
+    assert(hasattr(package, "__package__"))
+    fn = package.__file__
+    fn_dir = os.path.dirname(fn) + os.sep
+    module_visit = {fn}
+    del fn
+
+    def reload_recursive_ex(module):
+        importlib.reload(module)
+
+        for module_child in vars(module).values():
+            if isinstance(module_child, types.ModuleType):
+                fn_child = getattr(module_child, "__file__", None)
+                if (fn_child is not None) and fn_child.startswith(fn_dir):
+                    if fn_child not in module_visit:
+                        # print("reloading:", fn_child, "from", module)
+                        module_visit.add(fn_child)
+                        reload_recursive_ex(module_child)
+
+    return reload_recursive_ex(package)
+
+
 def load(directory, module, handler_path):
     file_path = path.join(directory, module)
     file_directory = path.dirname(file_path)
     sys.path.append(file_directory)
     function_file, function_name = path.splitext(handler_path)
     mod = importlib.import_module(function_file)
-    importlib.reload(mod)
+    reload_package(mod)
     func = getattr(mod, function_name.strip('.'))
     return func
 
