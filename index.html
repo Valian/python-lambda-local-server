@@ -75,7 +75,14 @@
         <div v-if="loading">Loading...</div>
         <div v-else>
           <div v-if="tab === 'event'">
-            {{ this.output }}
+            <ul>
+              <li>
+                <strong>Output:</strong><pre>{{ this.responseData }}</pre>
+              </li>
+              <li>
+                <strong>Logs:</strong><pre>{{ this.responseLog }}</pre>
+              </li>
+            </ul>
           </div>
           <div v-else>
             <ul>
@@ -88,6 +95,9 @@
               <li v-if="responseBody">
                 <strong>Body:</strong>
                 <pre>{{ this.responseBody | prettify }}</pre>
+              </li>
+              <li>
+                <strong>Logs:</strong><pre>{{ this.responseLog }}</pre>
               </li>
             </ul>
           </div>
@@ -122,21 +132,24 @@
       this.loadState()
     },
     computed: {
-      isJsonResponse: function () {
-        return this.output && this.output.headers && this.output.headers['Content-Type'] === 'application/json'
+      responseData: function () {
+        return this.output && this.output.stdout
       },
-      responseBody: function () {
-        if(this.isJsonResponse) {
-          return JSON.parse(this.output.body)
-        } else {
-          return this.output && this.output.body
-        }
+      responseLog: function () {
+        return this.output && this.output.stderr
       },
       responseStatusCode: function () {
-        return this.output && this.output.statusCode
+        return this.responseData && this.responseData.statusCode
       },
       responseHeaders: function () {
-        return this.output && this.output.headers
+        return this.responseData && this.responseData.headers
+      },
+      responseBody: function () {
+        try {
+          return JSON.parse(this.responseData.body)
+        } catch(e) {
+          return this.responseData && this.responseData.body
+        }
       }
     },
     filters: {
