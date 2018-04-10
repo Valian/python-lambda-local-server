@@ -1,14 +1,8 @@
 import argparse
 import asyncio
-import hashlib
 import json
-import shutil
-import subprocess
 import sys
 import os
-
-import traceback
-import uuid
 
 import logging
 
@@ -17,11 +11,10 @@ from functools import partial
 from aiohttp import web
 from os import path
 
+from requirements import Requirements
 
 SOURCES_DIR = "/var/task"
 SOURCES_REQUIREMENTS_NAME = path.join(SOURCES_DIR, "requirements.txt")
-PACKAGES_DIR = "/packages"
-PACKAGES_REQUIREMENTS_PATH = path.join(PACKAGES_DIR, "requirements.txt")
 LAMBDA_USER_ID = 496
 
 logger = logging.getLogger('lambda')
@@ -39,7 +32,7 @@ def jsonify(data, status_code=200):
         status=status_code)
 
 
-async def parse_request(args, request):
+async def parse_request(request):
     data = await request.json()
     arn_string = data.get('arn', '')
     version = data.get('version', '')
@@ -53,11 +46,11 @@ async def parse_request(args, request):
     return handler, event
 
 
-async def async_execute(handler, event):
+async def async_execute(handler, event, requirements):
     process = await asyncio.create_subprocess_exec(
         "python", "bootstrap.py", handler, json.dumps(event),
         cwd='/var/runtime/awslambda/',
-        env={**os.environ, 'PYTHONPATH': PACKAGES_DIR},
+        env={**os.environ, 'PYTHONPATH': requirements.directory},
         preexec_fn=partial(demote, LAMBDA_USER_ID, LAMBDA_USER_ID),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
@@ -71,38 +64,14 @@ async def async_execute(handler, event):
     return {'stdout': stdout, 'stderr': stderr}
 
 
-async def run_lambda(args, request):
-    handler, event = await parse_request(args, request)
-    result = await async_execute(handler, event)
+async def run_lambda(requirements, request):
+    handler, event = await parse_request(request)
+    result = await async_execute(handler, event, requirements)
     return jsonify(data=result)
 
 
 async def index(request):
     return web.FileResponse('./index.html')
-
-
-def get_md5_of_file(path):
-    try:
-        hash = hashlib.md5()
-        with open(path, 'rb') as f:
-            hash.update(f.read())
-        return hash.hexdigest()
-    except IOError:
-        return ''
-
-
-def install_requirements(args, force=False):
-    requirements_path = path.join(args.directory, args.requirements)
-    previous_requirements_path = PACKAGES_REQUIREMENTS_PATH
-    current_md5 = get_md5_of_file(requirements_path)
-    previous_md5 = get_md5_of_file(previous_requirements_path)
-    if current_md5 != previous_md5 or force:
-        logger.info("Updating requirements...")
-        shutil.rmtree(PACKAGES_DIR, ignore_errors=True)
-        subprocess.run(["pip", "install", "-t", PACKAGES_DIR, "-r", requirements_path])
-        shutil.copy(requirements_path, previous_requirements_path)
-    else:
-        logger.info("Requirements not changed, skipping update...")
 
 
 def init_logging(args):
@@ -112,10 +81,10 @@ def init_logging(args):
     logging.getLogger('aiohttp').setLevel(logging.WARN)
 
 
-def create_app(args):
+def create_app(requirements):
     app = web.Application()
     app.router.add_get('/', index)
-    app.router.add_post('/', partial(run_lambda, args))
+    app.router.add_post('/', partial(run_lambda, requirements))
     return app
 
 
@@ -134,11 +103,17 @@ def get_args():
     return parser.parse_args()
 
 
+def install_requirements(requirements_file_path):
+    req = Requirements(requirements_file_path)
+    req.ensure_installed()
+    return req
+
+
 def main():
     args = get_args()
     init_logging(args)
-    install_requirements(args)
-    app = create_app(args)
+    requirements = install_requirements(path.join(args.directory, args.requirements))
+    app = create_app(requirements)
     host = '0.0.0.0'
     port = 8080
     web.run_app(app, host=host, port=port)
