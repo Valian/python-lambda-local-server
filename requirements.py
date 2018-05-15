@@ -39,16 +39,21 @@ class Requirements:
             return None
 
     def ensure_installed(self, force_reinstall=False):
-        req_dir = self.directory
-        if not req_dir or not path.exists(req_dir) or force_reinstall:
-            logger.info(f"Updating requirements for tag '{self.tag}'...")
-            # If previous requirements exists, let's remove them
-            shutil.rmtree(req_dir, ignore_errors=True)
-            new_requirements_dir = self.get_requirements_directory(self.requirements_path)
-            subprocess.run([
-                "pip", "install",
-                "-t", new_requirements_dir,
-                "-r", self.requirements_path])
-            shutil.copy(self.requirements_path, self.cached_requirements_path)
+        if not path.exists(self.requirements_path):
+            logger.info(f"No requirements.txt found, skipping package installation")
         else:
-            logger.info(f"Requirements not changed, skipping update for tag '{self.tag}'...")
+            if self.directory and path.exists(self.directory) and not force_reinstall:
+                logger.info(f"Requirements not changed, skipping update for tag '{self.tag}'...")
+            else:
+                self._install_packages()
+
+    def _install_packages(self):
+        logger.info(f"Updating requirements for tag '{self.tag}'...")
+        # If previous requirements exists, let's remove them
+        shutil.rmtree(self.directory, ignore_errors=True)
+        new_requirements_dir = self.get_requirements_directory(self.requirements_path)
+        subprocess.run([
+            "python", "-m", "pip", "install",
+            "-t", new_requirements_dir,
+            "-r", self.requirements_path])
+        shutil.copy(self.requirements_path, self.cached_requirements_path)
