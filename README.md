@@ -1,5 +1,7 @@
 # python-lambda-local-server
 ![build](https://img.shields.io/docker/build/valian/python-lambda-local-server.svg)
+
+
 A Docker image to help with development of a local AWS lambda Python functions.
 Based on the [lambci/lambda](https://hub.docker.com/r/lambci/lambda/) image.
 Created, because I haven't found an easy way to run lambda function locally.
@@ -14,7 +16,7 @@ Features:
 
 Go to directory with your lambda Python code. Next, run this command:
 
-```bash
+```language:bash
 docker run -it \
   -p 8080:8080 \
   -v lambda-packages-cache:/packages/ \
@@ -42,7 +44,7 @@ cd python-lambda-local-server
 ```
 
 Next, start server with a proper volume mounted:
-```bash
+``` bash
 docker run -it \
   -p 8080:8080 \
   -v $PWD/example:/var/task/ \
