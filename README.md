@@ -15,11 +15,10 @@ Features:
 # Usage
 
 Go to directory with your lambda Python code. Next, run this command:
-
 ```language:bash
 docker run -it \
   -p 8080:8080 \
-  -v lambda-packages-cache:/packages/ \
+  -v lambda-packages-cache:/packages/ \ # if you want to persist packages cache
   -v $PWD:/var/task/ \
   valian/python-lambda-local-server
 ```
@@ -30,14 +29,13 @@ To see web UI, head to http://localhost:8080. You should see a simple web UI for
 ![Event UI](https://raw.githubusercontent.com/valian/python-lambda-local-server/master/pictures/event_ui.png)
 
 Assuming that you have your lambda entrypoint in `lambda.py` and handler is named `handler`, you should
-type it into desired inputs. Next, add JSON body that should be passed to the function as an event, and press 'Submit event'.
+type it into respective inputs. Next, add JSON body that should be passed to the function as an event, and press 'Submit event'.
 Result and logs should be visible on the right panel after a moment.
 
 
 # Example
 
 First, clone this repository:
-
 ```bash
 git clone https://github.com/Valian/python-lambda-local-server
 cd python-lambda-local-server
